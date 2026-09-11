@@ -128,7 +128,8 @@ function M.new(api, directory, report)
         end
     end
     function manager.close(done)
-        if closing then queued = done; return end
+        if not done then generation = generation + 1 end
+        if closing then queued = done or function() end; return end
         if not current then if done then done() end; return end
         local scope = current
         scope.active, current, closing = false, nil, true
@@ -136,6 +137,7 @@ function M.new(api, directory, report)
             local ok, err = pcall(api.CancelDelayedAction, id)
             if not ok then report('Timer cancellation failed: '..tostring(err)) end
         end
+        scope.timers = {}
         for _, slot in pairs(notifications) do slot.callback = nil end
         for _, slot in pairs(hooks) do slot.before, slot.after = nil, nil end
         for _, slot in pairs(maps) do slot.callback = nil end
