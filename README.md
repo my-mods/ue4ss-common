@@ -95,6 +95,8 @@ The file store remains independent: it performs no lifecycle registration and re
 
 ## Bundling and updates
 
+`UE4SSCommonSettingsUpgrade.ensure(store, path, schema, defaults, tag)` explicitly adds newly introduced keys to an existing numeric settings file. Call it only at the consumer's configuration boundary after a missing-new-key error. Only keys in `defaults` may be added; malformed values, duplicates and missing older keys still fail. It preserves existing text and preferences, validates the complete schema, verifies a temporary file and retains the original as `settings.ini.before-<tag>`. Occupied backups or concurrent edits stop replacement; failed final renames attempt to restore the original without overwriting a newer file. Keep recovery files if an error is reported. Importing the module performs no I/O, and the unchanged file store remains independently usable.
+
 Copy only required modules under the mod's `Scripts` directory, retaining `SettingsStore.lua` and the `UE4SSCommon` filenames. Include this repository's MIT license in the mod's documentation payload. Use a repository-level `ue4ss-common.lock.json` with `repository`, immutable `commit`, and `modules` entries containing `source`, `sha256` and `destinations`. Destination paths are relative to the consumer checkout.
 
 Updates are explicit: review a new commit, verify its module hashes, replace the declared copies, update the lock, run consumer regressions, and rebuild. A build must reject drift rather than silently refreshing from a branch. Ordinary builds require no network or common-library checkout. Roll back by restoring a previous lock and its matching files. Keep personal settings out of packages.
