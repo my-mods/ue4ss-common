@@ -1,0 +1,4 @@
+*.lua -text whitespace=cr-at-eol
+LICENSE text eol=lf
+*.md text eol=lf
+*.json text eol=lf

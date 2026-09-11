@@ -1,0 +1,7 @@
+.local/
+AGENTS.md
+tests/
+tools/
+*.log
+*.zip
+__pycache__/
