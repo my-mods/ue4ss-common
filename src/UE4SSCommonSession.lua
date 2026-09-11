@@ -184,12 +184,14 @@ function M.new(api, directory, report)
             local budget = 0
             for unit = 1,16 do
             if unit > 1 and api.os.clock()-started >= 0.0005 then break end
+            local cost = index > 0 and (scope.order[index].objectValue and 8 or 1) or 1
+            if budget + cost > 16 then break end
             local entry, callback
             local yieldFrame = false
             local ok, err = pcall(function()
                 if index > 0 then
                     entry = scope.order[index]; index = index - 1
-                    budget = budget + (entry.objectValue and 8 or 1)
+                    budget = budget + cost
                     local value, valid = entry.get()
                     if valid ~= false and equal(value,entry.last) then
                         yieldFrame = entry.set(entry.original) == true
