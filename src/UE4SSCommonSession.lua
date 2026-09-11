@@ -142,25 +142,33 @@ function M.new(api, directory, report)
         local index, cleanup = #scope.order, #scope.cleanup
         local failed, failedCleanup, firstError = {}, {}, nil
         local function step()
-            -- One restoration per later frame, including a possible native rebuild.
+            -- Small scalar restores can share a frame. A setter that rebuilds
+            -- native state returns true to yield; custom cleanup always yields.
+            local started = api.os.clock()
+            for unit = 1,16 do
+            if unit > 1 and api.os.clock()-started >= 0.0005 then break end
             local entry, callback
+            local yieldFrame = false
             local ok, err = pcall(function()
                 if index > 0 then
                     entry = scope.order[index]; index = index - 1
                     local value, valid = entry.get()
                     if valid ~= false and equal(value,entry.last) then
-                        entry.set(entry.original)
+                        yieldFrame = entry.set(entry.original) == true
                         local restored, stillValid = entry.get()
                         assert(stillValid == false or equal(restored,entry.original), 'Restore readback failed')
                     end
                 elseif cleanup > 0 then
                     callback = scope.cleanup[cleanup]; cleanup = cleanup - 1
                     callback()
+                    yieldFrame = true
                 end
             end)
             if not ok then
                 firstError = firstError or tostring(err)
                 if entry then failed[#failed+1] = entry else failedCleanup[#failedCleanup+1] = callback end
+            end
+            if not ok or yieldFrame or (index == 0 and cleanup == 0) then break end
             end
             if index > 0 or cleanup > 0 then api.ExecuteInGameThreadWithDelay(16, step)
             else
