@@ -19,14 +19,14 @@ function M.new(options)
         ids[key]=id
     end
     local values,handler,ticket,started,unsubscribe=nil,nil,nil,false,nil
-    local revision,lastError=0,nil
+    local revision=0
+    local failures,failureCount={},0
     local api={}
     local function report(err)
         local message=tostring(err)
-        if lastError~=message then
-            lastError=message
-            if o.report then o.report('Live settings: '..message) end
-        end
+        if failures[message] or failureCount>=64 then return end
+        failures[message]=true;failureCount=failureCount+1
+        if o.report then o.report('Live settings: '..message) end
     end
     local function validate(candidate)
         for key,row in pairs(schema) do
@@ -58,7 +58,7 @@ function M.new(options)
             if old~=value then changed[key]={old=old,new=value} end
         end
         if not next(changed) then return false end
-        values=candidate;revision=revision+1;lastError=nil
+        values=candidate;revision=revision+1
         if handler then
             local ok,err=pcall(handler,copy(values),changed)
             if not ok then report(err) end
@@ -98,7 +98,7 @@ function M.new(options)
         started=true -- Partial native registration must never be retried.
         local ok,result=pcall(subscribe,assert(o.modId),api.accept)
         if not ok then report(result);return false end
-        assert(type(result)=='function','Settings subscription did not return an unsubscribe function')
+        if type(result)~='function' then report('Settings subscription did not return an unsubscribe function');return false end
         unsubscribe=result
         return true
     end
