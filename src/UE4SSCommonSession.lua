@@ -1,8 +1,10 @@
 -- MIT. Explicit session ownership; importing this module has no side effects.
 local M = {}
-function M.new(api, directory, report)
+function M.new(api, directory, report, options)
     local current, closing, queued, generation = nil, nil, nil, 0
     local notifications, hooks, maps = {}, {}, {}
+    local deferredCleanup
+    local canCleanup = options and options.canCleanup
     report = report or function() end
     local function guard(scope, fn)
         return function(...)
@@ -22,6 +24,13 @@ function M.new(api, directory, report)
         return slot
     end
     local manager = {watch=watch}
+    function manager.resumeCleanup()
+        if deferredCleanup then
+            local callback = deferredCleanup
+            deferredCleanup = nil
+            api.ExecuteInGameThreadWithDelay(16, callback)
+        end
+    end
     function manager.pause()
         generation = generation + 1
         if current then current.active = false end
@@ -178,11 +187,13 @@ function M.new(api, directory, report)
         local failed, failedCleanup, firstError = {}, {}, nil
         local skippedObjects = 0
         local function step()
+            if canCleanup and not canCleanup() then deferredCleanup = step; return end
             -- Small scalar restores can share a frame. A setter that rebuilds
             -- native state returns true to yield; custom cleanup always yields.
             local started = api.os.clock()
             local budget = 0
             for unit = 1,16 do
+            if canCleanup and not canCleanup() then deferredCleanup = step; return end
             if unit > 1 and api.os.clock()-started >= 0.0005 then break end
             local cost = index > 0 and (scope.order[index].objectValue and 8 or 1) or 1
             if budget + cost > 16 then break end
