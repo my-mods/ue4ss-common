@@ -5,6 +5,7 @@ function M.new(api, directory, report, options)
     local notifications, hooks, maps = {}, {}, {}
     local deferredCleanup
     local canCleanup = options and options.canCleanup
+    local settings = options and options.settings
     report = report or function() end
     local function guard(scope, fn)
         return function(...)
@@ -44,6 +45,7 @@ function M.new(api, directory, report, options)
     local function launch(file, context)
         local scope = {active=true, timers={}, journal={}, order={}, cleanup={}}
         current = scope
+        if settings then context.settings=settings.snapshot() end
         local env = setmetatable({Session=scope, SaveLoadContext=context}, {__index=api})
         env._G = env
         local loaded = {}
@@ -68,6 +70,19 @@ function M.new(api, directory, report, options)
             local result = api.CancelDelayedAction(id)
             scope.timers[id] = nil
             return result
+        end
+        function scope.onSettings(callback)
+            assert(settings, 'Session has no settings adapter')
+            scope.settingsHandler=callback
+        end
+        -- Whole-mod enable/disable only. Ordinary edits use onSettings in place.
+        function scope.restart()
+            if scope.restartPending then return end
+            scope.restartPending=true
+            env.ExecuteInGameThreadWithDelay(16,function()
+                scope.restartPending=false
+                manager.open(file,context)
+            end)
         end
         function env.NotifyOnNewObject(path, callback)
             local slot = watch(path)
@@ -244,6 +259,13 @@ function M.new(api, directory, report, options)
         generation = generation + 1
         local ticket = generation
         manager.close(function() if ticket == generation then launch(file, context) end end)
+    end
+    if settings then
+        settings.attach(function(values,changes)
+            if current and current.active and current.settingsHandler then
+                current.settingsHandler(values,changes)
+            end
+        end)
     end
     return manager
 end
